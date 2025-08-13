@@ -1,38 +1,33 @@
-name: Deploy FastAPI App with Terraform
+name: Prepare Task Folder
 
 on:
   push:
     branches:
-      - main
+      - main  # run when code is pushed to main branch
+  workflow_dispatch: # allow manual run
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # Step 1: Checkout your repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create Task structure
+      # Step 2: Create Task folder structure
+      - name: Create Task folder structure
         run: |
           mkdir -p Task/app
-          mkdir -p Task/Terraform
+          mkdir -p Task/terraform
 
-      - name: Copy FastAPI app to Task/app
-        run: |
-          cp main.py Task/app/
-          cp database.py Task/app/
-          cp Dockerfile Task/app/
-          cp requirements.txt Task/app/
-          cp .env Task/app/
+      # Step 3: Copy FastAPI app files
+      - name: Copy FastAPI app files
+        run: cp -r app/* Task/app/
 
-      - name: Copy Terraform files to Task/Terraform
-        run: |
-          cp Terraform/* Task/Terraform/
+      # Step 4: Copy Terraform files
+      - name: Copy Terraform files
+        run: cp -r Terraform/* Task/terraform/
 
-      - name: Verify structure
-        run: tree Task
-
-      # You can add Terraform init/plan/apply steps here if needed
-      # - name: Terraform Init
-      #   run: terraform -chdir=Task/Terraform init
+   
+      
