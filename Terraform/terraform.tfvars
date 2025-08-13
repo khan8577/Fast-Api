@@ -1,0 +1,24 @@
+# Copy this file to terraform.tfvars and customize the values
+
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Key Pair Configuration
+key_pair_name   = "Server-key"
+public_key_path = "~/.ssh/My-server.pub"
+
+# EC2 Instance Configuration
+instance_name = "My-Server"
+instance_type = "t2.micro"
+
+# Storage Configuration
+root_volume_type = "gp3"
+root_volume_size = 20
+
+# Monitoring and Security
+enable_monitoring             = false
+enable_termination_protection = false
+
+# Tagging
+environment  = "dev"
+project_name = "terraform-ec2"
