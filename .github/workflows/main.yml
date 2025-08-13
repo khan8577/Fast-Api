@@ -1,4 +1,62 @@
-name: Deploy to EC2
+# name: Deploy to EC2
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       # 1. Checkout your code
+#       - name: Checkout code
+#         uses: actions/checkout@v3
+
+#       # 2. Set up SSH key for EC2
+#       - name: Set up SSH key
+#         uses: webfactory/ssh-agent@v0.9.0
+#         with:
+#           ssh-private-key: ${{ secrets.EC2_KEY }}
+
+#       # 3. Test SSH connection
+#       - name: Test SSH connection
+#         run: |
+#           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'echo "SSH connection successful"'
+
+#       # 4. Copy project to EC2
+#       - name: Copy project to EC2
+#         run: |
+#           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ~/fastapi_supabase"
+#           scp -o StrictHostKeyChecking=no -r ./app/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/fastapi_supabase/
+
+#       # 5. List files on EC2 (optional debug)
+#       - name: List files on EC2
+#         run: |
+#           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "ls -la ~/fastapi_supabase"
+
+#       # 6. Check Docker version
+#       - name: Check Docker version
+#         run: |
+#           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'docker --version'
+
+#       # 7. Build and deploy Docker container
+#       - name: Deploy on EC2
+#         run: |
+#           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+#           cd ~/fastapi_supabase
+
+#           # Create .env from GitHub Secrets
+#           echo "DB_USER=${{ secrets.DB_USER }}" > .env
+#           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+#           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+#           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+#           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+#           echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" >> .env
+#           echo "DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}" >> .env
+#           echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+name: Deploy FastAPI + Terraform to EC2
 
 on:
   push:
@@ -10,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout your code
+      # 1. Checkout the repo
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -25,29 +83,24 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'echo "SSH connection successful"'
 
-      # 4. Copy project to EC2
-      - name: Copy project to EC2
+      # 4. Copy entire fastapi_supabase directory to EC2
+      - name: Copy repo to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ~/fastapi_supabase"
-          scp -o StrictHostKeyChecking=no -r ./app/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/fastapi_supabase/
+          scp -o StrictHostKeyChecking=no -r ./* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/fastapi_supabase/
 
-      # 5. List files on EC2 (optional debug)
-      - name: List files on EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "ls -la ~/fastapi_supabase"
-
-      # 6. Check Docker version
-      - name: Check Docker version
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'docker --version'
-
-      # 7. Build and deploy Docker container
-      - name: Deploy on EC2
+      # 5. Build and deploy Docker container from app directory
+      - name: Build & Deploy Docker on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/fastapi_supabase
+          cd ~/fastapi_supabase/app   # go to app directory containing Dockerfile
 
-          # Create .env from GitHub Secrets
+          # Clean old containers/images
+          sudo docker stop fastapi-supabase || true
+          sudo docker rm fastapi-supabase || true
+          sudo docker system prune -af
+
+          # Create .env file from GitHub secrets
           echo "DB_USER=${{ secrets.DB_USER }}" > .env
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
@@ -56,3 +109,12 @@ jobs:
           echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" >> .env
           echo "DOCKER_PASSWORD=${{ secrets.DOCKER_PASSWORD }}" >> .env
           echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+          echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> .env
+
+          # Build Docker image
+          sudo docker build -t fastapi-supabase .
+
+          # Run Docker container
+          sudo docker run -d --name fastapi-supabase --env-file .env -p 8000:8000 fastapi-supabase
+          EOF
